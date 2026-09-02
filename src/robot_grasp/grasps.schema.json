@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robocup.local/schemas/grasps.schema.json",
+  "title": "Robot grasp candidates",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "object_id", "length_unit", "transform_convention", "candidates"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "object_id": {"type": "string", "minLength": 1},
+    "length_unit": {"const": "meter"},
+    "transform_convention": {"const": "T_dst_src transforms points from src coordinates into dst coordinates"},
+    "candidates": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/candidate"}
+    }
+  },
+  "$defs": {
+    "matrix4": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "array",
+        "minItems": 4,
+        "maxItems": 4,
+        "items": {"type": "number"}
+      }
+    },
+    "vector3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"type": "number"}
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "T_object_grasp", "pregrasp_offset", "gripper_width",
+        "approach_distance", "priority", "enabled", "symmetry_class", "notes"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "T_object_grasp": {"$ref": "#/$defs/matrix4"},
+        "pregrasp_offset": {"$ref": "#/$defs/vector3"},
+        "gripper_width": {"type": "number", "minimum": 0},
+        "approach_distance": {"type": "number", "minimum": 0},
+        "priority": {"type": "integer"},
+        "enabled": {"type": "boolean"},
+        "symmetry_class": {"type": "string"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

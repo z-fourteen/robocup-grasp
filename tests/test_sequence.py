@@ -1,0 +1,61 @@
+import json
+
+import numpy as np
+from PIL import Image
+import pytest
+
+from robot_grasp.errors import ValidationError
+from robot_grasp.sequence import validate_sequence
+
+
+def write_json(path, data):
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def make_sequence(tmp_path):
+    for name in ("rgb", "depth", "masks", "poses"):
+        (tmp_path / name).mkdir()
+    Image.fromarray(np.zeros((3, 4, 3), dtype=np.uint8)).save(tmp_path / "rgb" / "000.png")
+    Image.fromarray(np.full((3, 4), 500, dtype=np.uint16)).save(tmp_path / "depth" / "000.png")
+    Image.fromarray(np.full((3, 4), 255, dtype=np.uint8)).save(tmp_path / "masks" / "000.png")
+    write_json(tmp_path / "poses" / "000.json", {"T_base_camera": np.eye(4).tolist()})
+    write_json(tmp_path / "intrinsics.json", {"width": 4, "height": 3, "fx": 4, "fy": 4, "cx": 1.5, "cy": 1})
+    write_json(tmp_path / "metadata.json", {
+        "depth_scale": 1000.0,
+        "object_id": "test_object",
+        "coordinate_frames": {"base": "fixed world frame", "camera": "optical frame; poses are T_base_camera"},
+    })
+
+
+def test_valid_sequence(tmp_path):
+    make_sequence(tmp_path)
+    sequence = validate_sequence(tmp_path)
+    assert len(sequence.frames) == 1
+    assert sequence.depth_scale == 1000.0
+    assert sequence.frames[0].valid_depth_ratio == 1.0
+
+
+def test_unmatched_stem_has_actionable_error(tmp_path):
+    make_sequence(tmp_path)
+    (tmp_path / "masks" / "000.png").rename(tmp_path / "masks" / "wrong.png")
+    with pytest.raises(ValidationError) as exc_info:
+        validate_sequence(tmp_path)
+    message = str(exc_info.value)
+    assert "Frame '000' is missing ['mask']" in message
+    assert "exact stem '000'" in message
+
+
+def test_bad_pose_names_file_and_fix(tmp_path):
+    make_sequence(tmp_path)
+    write_json(tmp_path / "poses" / "000.json", {"T_camera_base": np.eye(4).tolist()})
+    with pytest.raises(ValidationError) as exc_info:
+        validate_sequence(tmp_path)
+    assert str(tmp_path / "poses" / "000.json") in str(exc_info.value)
+    assert "T_base_camera" in str(exc_info.value)
+
+
+def test_image_size_mismatch_names_image(tmp_path):
+    make_sequence(tmp_path)
+    Image.fromarray(np.zeros((2, 4, 3), dtype=np.uint8)).save(tmp_path / "rgb" / "000.png")
+    with pytest.raises(ValidationError, match="has size 4x2, expected 4x3"):
+        validate_sequence(tmp_path)

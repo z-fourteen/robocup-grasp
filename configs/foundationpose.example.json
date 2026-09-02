@@ -1,0 +1,11 @@
+{
+  "foundationpose_dir": "/absolute/path/to/FoundationPose",
+  "mesh_path": "/absolute/path/to/model/mesh_object.ply",
+  "intrinsics_path": "/absolute/path/to/intrinsics.json",
+  "mask_path": "/absolute/path/to/current_mask.png",
+  "depth_scale": 1000.0,
+  "output_convention": "T_camera_object",
+  "module": "estimater",
+  "register_iterations": 5,
+  "debug_dir": "/tmp/foundationpose_debug"
+}

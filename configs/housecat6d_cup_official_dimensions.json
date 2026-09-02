@@ -1,0 +1,10 @@
+{
+  "length_unit": "meter",
+  "dimensions": {
+    "x": 0.111668,
+    "y": 0.080356,
+    "z": 0.085478
+  },
+  "source": "Axis-aligned bounding box of the official HouseCat6D cup-plastic_green_flowers.obj after T_object_model",
+  "notes": "Reference-model dimensions, not physical caliper measurements. Replace with caliper measurements for a real object."
+}

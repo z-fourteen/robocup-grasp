@@ -1,0 +1,8 @@
+{
+  "depth_scale": 1000.0,
+  "object_id": "example_cup",
+  "coordinate_frames": {
+    "base": "Fixed reconstruction/world frame in meters.",
+    "camera": "Optical frame; each pose file stores T_base_camera."
+  }
+}

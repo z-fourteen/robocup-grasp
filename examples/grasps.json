@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "object_id": "example_cup",
+  "length_unit": "meter",
+  "transform_convention": "T_dst_src transforms points from src coordinates into dst coordinates",
+  "candidates": [
+    {
+      "id": "side_handle",
+      "T_object_grasp": [
+        [1.0, 0.0, 0.0, 0.02],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.08],
+        [0.0, 0.0, 0.0, 1.0]
+      ],
+      "pregrasp_offset": [0.0, 0.0, -0.1],
+      "gripper_width": 0.06,
+      "approach_distance": 0.1,
+      "priority": 10,
+      "enabled": true,
+      "symmetry_class": "cup_handle_fixed",
+      "notes": "Text-only dry-run example."
+    }
+  ]
+}

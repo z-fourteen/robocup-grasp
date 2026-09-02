@@ -1,0 +1,5 @@
+{
+  "length_unit": "meter",
+  "dimensions": {"x": 0.08, "y": 0.08, "z": 0.12},
+  "notes": "Replace with dimensions measured along the object-frame x/y/z axes."
+}

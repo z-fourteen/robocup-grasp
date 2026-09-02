@@ -1,0 +1,15 @@
+{
+  "T_object_model": [
+    [-1.0, 0.0, 0.0, 0.01542254],
+    [0.0, 0.0, 1.0, -0.00011925],
+    [0.0, 1.0, 0.0, 0.040389001],
+    [0.0, 0.0, 0.0, 1.0]
+  ],
+  "length_unit": "meter",
+  "derivation": {
+    "model_origin_in_model_m": [0.01542254, -0.040389001, 0.00011925],
+    "object_x": "toward handle, equal to -X_model",
+    "object_y": "equal to +Z_model",
+    "object_z": "cup axis upward, equal to +Y_model"
+  }
+}

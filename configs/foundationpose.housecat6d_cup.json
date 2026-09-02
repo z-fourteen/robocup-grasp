@@ -1,0 +1,11 @@
+{
+  "foundationpose_dir": "/home/ustc/foundationpose",
+  "mesh_path": "/home/ustc/robocup-zgh/robot_grasp/models/objects/housecat6d_cup/v1/mesh_object.ply",
+  "intrinsics_path": "/home/ustc/robocup-zgh/robot_grasp/data/interim/housecat6d/val_scene1_cup_raw/intrinsics.json",
+  "mask_path": null,
+  "depth_scale": 1000.0,
+  "output_convention": "T_camera_object",
+  "module": "estimater",
+  "register_iterations": 5,
+  "debug_dir": "/home/ustc/robocup-zgh/robot_grasp/outputs/inference/housecat6d_cup/foundationpose_debug"
+}

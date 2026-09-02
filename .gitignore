@@ -1,0 +1,41 @@
+# Python build and test artifacts.
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Local datasets. Keep only the documented directory skeleton in Git.
+data/*
+!data/README.md
+!data/raw/
+!data/interim/
+!data/processed/
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Downloaded weights and generated object packages.
+models/*
+!models/README.md
+!models/objects/
+!models/weights/
+models/objects/*
+models/weights/*
+!models/objects/.gitkeep
+!models/weights/.gitkeep
+
+# Reproducible run outputs.
+outputs/*
+!outputs/README.md
+!outputs/reconstruction/
+!outputs/inference/
+!outputs/acceptance/
+outputs/reconstruction/*
+outputs/inference/*
+outputs/acceptance/*
+!outputs/reconstruction/.gitkeep
+!outputs/inference/.gitkeep
+!outputs/acceptance/.gitkeep
