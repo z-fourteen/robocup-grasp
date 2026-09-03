@@ -210,7 +210,7 @@ Mesh 验收目前只比较对象坐标系下 AABB。AABB 正确不能排除孔�
 - Python/Open3D/FoundationPose/CUDA 环境没有统一锁定。
 - 运行报告没有记录代码 commit、依赖版本、GPU、耗时和随机种子。
 - 默认 Python 环境无法导入 Open3D，首批重建结果需要切换到另一个环境才能复跑。
-- 当前 Git 状态下 `robot_grasp/` 整体尚未纳入版本控制，缺少首个稳定代码基线。
+- `robocup-grasp` 已建立独立 Git 仓库，核心代码、配置、文档和测试已有稳定基线。
 
 ## 5. 改进路线
 

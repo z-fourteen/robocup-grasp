@@ -10,7 +10,7 @@ BundleSDF 已移到仓库根目录的独立 `BundleSDF/`，其实验资产位于
 ## 目录结构
 
 ```text
-robot_grasp/
+robocup-grasp/
   src/robot_grasp/       # 可安装的核心 Python 包
   configs/               # 受版本控制的运行配置
   examples/              # 小型、可提交的格式示例
@@ -40,17 +40,17 @@ models/objects`。详细放置规则见 [`data/README.md`](data/README.md)、
 在仓库根目录进行可编辑安装：
 
 ```bash
-python -m pip install -e robot_grasp
+python -m pip install -e .
 ```
 
 重建、Mesh 坐标系转换、查看器和 Mesh 尺寸验收额外需要 Open3D：
 
 ```bash
-python -m pip install -e "robot_grasp[open3d]"
+python -m pip install -e ".[open3d]"
 ```
 
-也可继续使用 `robot_grasp/requirements/base.txt` 和
-`robot_grasp/requirements/open3d.txt` 构建固定环境。安装后统一使用 `robot-grasp` 命令。
+也可继续使用 `requirements/base.txt` 和 `requirements/open3d.txt` 构建固定环境。
+安装后统一使用 `robot-grasp` 命令。
 
 FoundationPose 是外部可选依赖，项目不会下载仓库、权重或 CUDA 依赖。应按所用
 FoundationPose 版本的文档单独安装，再填写
@@ -92,7 +92,7 @@ sequence/
 
 ```bash
 robot-grasp validate-sequence \
-  --input robot_grasp/examples/minimal_sequence
+  --input examples/minimal_sequence
 ```
 
 仓库中的最小序列使用文本 PPM/PGM，不含大型二进制，仅用于格式和 dry-run 校验，不足以生成有意义的
@@ -106,12 +106,12 @@ BOP scenewise 数据包含 RGB、16 位深度、内参、对象姿态和实例 m
 
 ```bash
 robot-grasp import-bop \
-  --dataset robot_grasp/data/raw/bop/lm \
+  --dataset data/raw/bop/lm \
   --split test \
   --scene 1 \
   --object-id 1 \
   --frame-step 4 \
-  --output robot_grasp/data/interim/lm_ape_sequence
+  --output data/interim/lm_ape_sequence
 ```
 
 导入使用 `mask_visib`，且要求所选帧内参和深度单位一致。输出完成后会自动运行严格序列校验并写入
@@ -124,7 +124,7 @@ LINEMOD BOP19 子集适合校验数据格式、变换方向和 FoundationPose �
 
 ### 导入 HouseCat6D 杯子基准
 
-已下载数据位于 `robot_grasp/data/raw/housecat6d/`，下载来源、SHA-256 和内容检查记录在
+已下载数据位于 `data/raw/housecat6d/`，下载来源、SHA-256 和内容检查记录在
 `download_manifest.json`。当前第一轮对象为 `val_scene1` 中的
 `cup-plastic_green_flowers`（实例 ID 4）。695 帧数值闭环确认了原始标注语义：
 
@@ -138,20 +138,20 @@ T_camera_object = inverse(T_world_camera) @ T_world_object
 
 ```bash
 robot-grasp import-housecat6d \
-  --dataset robot_grasp/data/raw/housecat6d/dataset \
+  --dataset data/raw/housecat6d/dataset \
   --scene val_scene1 \
   --object cup-plastic_green_flowers \
   --depth-source depth \
   --frame-step 5 \
-  --output robot_grasp/data/interim/housecat6d/val_scene1_cup_raw
+  --output data/interim/housecat6d/val_scene1_cup_raw
 
 robot-grasp import-housecat6d \
-  --dataset robot_grasp/data/raw/housecat6d/dataset \
+  --dataset data/raw/housecat6d/dataset \
   --scene val_scene1 \
   --object cup-plastic_green_flowers \
   --depth-source depth_gt \
   --frame-step 5 \
-  --output robot_grasp/data/interim/housecat6d/val_scene1_cup_depth_gt
+  --output data/interim/housecat6d/val_scene1_cup_depth_gt
 ```
 
 两者都显式保存 `depth_scale=1000.0`，导入完成后自动执行严格序列校验。标签 pickle 使用受限读取器，
@@ -161,9 +161,9 @@ robot-grasp import-housecat6d \
 
 ```bash
 robot-grasp reconstruct \
-  --input robot_grasp/data/processed/cup_01/v1 \
-  --output robot_grasp/outputs/reconstruction/cup_01/v1 \
-  --config robot_grasp/configs/reconstruction.yaml
+  --input data/processed/cup_01/v1 \
+  --output outputs/reconstruction/cup_01/v1 \
+  --config configs/reconstruction.yaml
 ```
 
 默认参数为 `voxel_length=0.0025`、`sdf_trunc=0.01`、`depth_min=0.1`、
@@ -191,9 +191,9 @@ T_camera_base = inverse(T_base_camera)
 
 ```bash
 robot-grasp reconstruct \
-  --input robot_grasp/data/interim/housecat6d/val_scene1_cup_depth_gt \
-  --output robot_grasp/outputs/reconstruction/housecat6d_cup/depth_gt_highres \
-  --config robot_grasp/configs/reconstruction.housecat6d_depth_gt.yaml
+  --input data/interim/housecat6d/val_scene1_cup_depth_gt \
+  --output outputs/reconstruction/housecat6d_cup/depth_gt_highres \
+  --config configs/reconstruction.housecat6d_depth_gt.yaml
 ```
 
 重建对象在模型坐标轴下为 `111.346 x 84.913 x 80.978 mm`，对比官方 Mesh 的
@@ -227,10 +227,10 @@ robot-grasp reconstruct \
 
 ```bash
 robot-grasp set-object-frame \
-  --mesh robot_grasp/outputs/reconstruction/cup_01/v1/mesh_high.ply \
-  --transform robot_grasp/examples/T_object_model.json \
+  --mesh outputs/reconstruction/cup_01/v1/mesh_high.ply \
+  --transform examples/T_object_model.json \
   --object-id cup_01 \
-  --output robot_grasp/models/objects/cup_01/v1
+  --output models/objects/cup_01/v1
 ```
 
 输出目录保存 `mesh_object.ply`、`object_frame.json` 和一份 `model_original.*` 原始 Mesh 副本；输入
@@ -245,10 +245,10 @@ HouseCat6D 杯子已经使用
 
 ```bash
 robot-grasp set-object-frame \
-  --mesh robot_grasp/outputs/reconstruction/housecat6d_cup/depth_gt_highres/mesh_high.ply \
-  --transform robot_grasp/configs/housecat6d_cup_object_frame.json \
+  --mesh outputs/reconstruction/housecat6d_cup/depth_gt_highres/mesh_high.ply \
+  --transform configs/housecat6d_cup_object_frame.json \
   --object-id housecat6d_cup \
-  --output robot_grasp/models/objects/housecat6d_cup/v1
+  --output models/objects/housecat6d_cup/v1
 ```
 
 `models/objects/housecat6d_cup/v1/grasps.json` 包含 `handle_side`、`body_opposite_handle` 和
@@ -265,10 +265,10 @@ robot-grasp set-object-frame \
 
 ```bash
 robot-grasp grasps add \
-  --grasps robot_grasp/models/objects/cup_01/v1/grasps.json \
+  --grasps models/objects/cup_01/v1/grasps.json \
   --object-id cup_01 \
   --id side_handle \
-  --transform robot_grasp/examples/T_object_grasp.json \
+  --transform examples/T_object_grasp.json \
   --pregrasp-offset 0 0 -0.10 \
   --gripper-width 0.06 \
   --approach-distance 0.10 \
@@ -279,18 +279,18 @@ robot-grasp grasps add \
 查看、更新和删除：
 
 ```bash
-robot-grasp grasps list --grasps robot_grasp/models/objects/cup_01/v1/grasps.json
-robot-grasp grasps show --grasps robot_grasp/models/objects/cup_01/v1/grasps.json --id side_handle
-robot-grasp grasps update --grasps robot_grasp/models/objects/cup_01/v1/grasps.json --id side_handle --priority 20
-robot-grasp grasps delete --grasps robot_grasp/models/objects/cup_01/v1/grasps.json --id side_handle
+robot-grasp grasps list --grasps models/objects/cup_01/v1/grasps.json
+robot-grasp grasps show --grasps models/objects/cup_01/v1/grasps.json --id side_handle
+robot-grasp grasps update --grasps models/objects/cup_01/v1/grasps.json --id side_handle --priority 20
+robot-grasp grasps delete --grasps models/objects/cup_01/v1/grasps.json --id side_handle
 ```
 
 Open3D 最小查看器不连接机器人：
 
 ```bash
 robot-grasp view-grasps \
-  --mesh robot_grasp/models/objects/cup_01/v1/mesh_object.ply \
-  --grasps robot_grasp/models/objects/cup_01/v1/grasps.json
+  --mesh models/objects/cup_01/v1/mesh_object.ply \
+  --grasps models/objects/cup_01/v1/grasps.json
 ```
 
 对象原点和当前 TCP 均显示坐标轴。按键：`W/S` 沿对象 `Y` 平移，`A/D` 沿 `X`，`Q/E` 沿
@@ -330,10 +330,10 @@ T_camera_object = estimator.estimate(rgb, raw_depth, mask=object_mask)
 
 ```bash
 robot-grasp evaluate-foundationpose \
-  --config robot_grasp/configs/foundationpose.housecat6d_cup.json \
-  --sequence robot_grasp/data/interim/housecat6d/val_scene1_cup_raw \
-  --object-frame robot_grasp/configs/housecat6d_cup_object_frame.json \
-  --output robot_grasp/outputs/inference/housecat6d_cup/five_view_registration \
+  --config configs/foundationpose.housecat6d_cup.json \
+  --sequence data/interim/housecat6d/val_scene1_cup_raw \
+  --object-frame configs/housecat6d_cup_object_frame.json \
+  --output outputs/inference/housecat6d_cup/five_view_registration \
   --frame-step 30 \
   --max-frames 5
 ```
@@ -349,9 +349,9 @@ robot-grasp evaluate-foundationpose \
 
 ```bash
 robot-grasp compose-grasp \
-  --camera-pose robot_grasp/examples/T_base_camera.json \
-  --object-pose robot_grasp/examples/T_camera_object.json \
-  --grasps robot_grasp/examples/grasps.json
+  --camera-pose examples/T_base_camera.json \
+  --object-pose examples/T_camera_object.json \
+  --grasps examples/grasps.json
 ```
 
 输出为机器可读 JSON，并严格计算：
@@ -364,9 +364,9 @@ T_base_grasp = T_base_camera @ T_camera_object @ T_object_grasp
 
 ```bash
 robot-grasp compose-grasp \
-  --camera-pose robot_grasp/outputs/inference/housecat6d_cup/five_view_registration/compose_inputs/000300_camera_pose.json \
-  --object-pose robot_grasp/outputs/inference/housecat6d_cup/five_view_registration/compose_inputs/000300_object_pose.json \
-  --grasps robot_grasp/models/objects/housecat6d_cup/v1/grasps.json
+  --camera-pose outputs/inference/housecat6d_cup/five_view_registration/compose_inputs/000300_camera_pose.json \
+  --object-pose outputs/inference/housecat6d_cup/five_view_registration/compose_inputs/000300_object_pose.json \
+  --grasps models/objects/housecat6d_cup/v1/grasps.json
 ```
 
 该命令成功选择 `handle_side` 并输出 `T_base_grasp`；这里的 `base` 仍是离线 HouseCat6D 基准系。
@@ -379,11 +379,11 @@ robot-grasp compose-grasp \
 
 ```bash
 robot-grasp accept \
-  --mesh robot_grasp/models/objects/cup_01/v1/mesh_object.ply \
-  --caliper robot_grasp/examples/caliper.json \
-  --poses robot_grasp/examples/object_pose_samples.json \
-  --config robot_grasp/configs/acceptance.yaml \
-  --output robot_grasp/outputs/acceptance/cup_01/v1
+  --mesh models/objects/cup_01/v1/mesh_object.ply \
+  --caliper examples/caliper.json \
+  --poses examples/object_pose_samples.json \
+  --config configs/acceptance.yaml \
+  --output outputs/acceptance/cup_01/v1
 ```
 
 Mesh 使用对象坐标系轴对齐包围盒与卡尺 `x/y/z` 对比。位姿重复性报告所有样本对中的平移距离和
@@ -395,11 +395,11 @@ HouseCat6D 正式验收命令如下，其中尺寸参考来自官方 Mesh，不�
 
 ```bash
 robot-grasp accept \
-  --mesh robot_grasp/models/objects/housecat6d_cup/v1/mesh_object.ply \
-  --caliper robot_grasp/configs/housecat6d_cup_official_dimensions.json \
-  --poses robot_grasp/outputs/inference/housecat6d_cup/five_view_registration/acceptance_pose_samples.json \
-  --config robot_grasp/configs/acceptance.yaml \
-  --output robot_grasp/outputs/acceptance/housecat6d_cup/five_view
+  --mesh models/objects/housecat6d_cup/v1/mesh_object.ply \
+  --caliper configs/housecat6d_cup_official_dimensions.json \
+  --poses outputs/inference/housecat6d_cup/five_view_registration/acceptance_pose_samples.json \
+  --config configs/acceptance.yaml \
+  --output outputs/acceptance/housecat6d_cup/five_view
 ```
 
 实际报告为失败并返回退出码 `1`：Mesh 最大尺寸误差 `0.622 mm` 通过，旋转重复性
@@ -408,7 +408,7 @@ robot-grasp accept \
 
 ## HOI4D / Wild6D 复杂度升级条件
 
-当前下载状态记录在 `robot_grasp/data/raw/hoi4d/download_manifest.json`：HOI4D Mug 子集含 300 帧
+当前下载状态记录在 `data/raw/hoi4d/download_manifest.json`：HOI4D Mug 子集含 300 帧
 RGB、raw/prior depth、内参与逐帧相机外参，但这个镜像子集不含对象 mask、精确实例 Mesh或对象 6D GT。
 因此它目前只能作为动态交互数据资产，不能直接宣称已验证对象 TSDF、FoundationPose 绝对误差或整条抓取
 管线。进入同等级验收前必须补齐并核对：
@@ -425,8 +425,8 @@ HouseCat6D 几何基准的替代品。
 ## 测试
 
 ```bash
-pytest -q robot_grasp/tests
-python -m compileall -q robot_grasp/src/robot_grasp
+pytest -q tests
+python -m compileall -q src/robot_grasp
 ```
 
 单元测试覆盖单位矩阵、已知旋转和平移、逆变换往返、非法旋转、容易写反的组合方向、序列配对与
