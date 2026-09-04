@@ -1,0 +1,3 @@
+# Optional live robot-state recorder. The core package remains usable without
+# Zenoh so CI and offline dataset work do not require a hardware middleware.
+eclipse-zenoh>=1.0
