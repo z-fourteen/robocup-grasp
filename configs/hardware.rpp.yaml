@@ -1,0 +1,141 @@
+# Hardware inventory observed on 2026-09-04. Runtime values that were not
+# exposed by the device documents remain explicit instead of being guessed.
+schema_version: 1
+platform:
+  os: ubuntu-22.04
+  middleware: zenoh
+  serialization:
+    - json
+    - fastcdr
+  workspace: /home/rpp/rpp_ws
+
+robot:
+  vendor: Rokae (Luoshi)
+  model: R1 mobile base with dual AR5 arms
+  serial: unknown
+  host_ip: 192.168.11.11
+  arm_count: 2
+  joint_count: 6
+  active_arm: right
+  arms:
+    left:
+      model: AR5L08
+      ip: 192.168.11.60
+      side: left
+    right:
+      model: AR5R08
+      ip: 192.168.11.61
+      side: right
+  control:
+    port: 8090
+    realtime_port: 10001
+    period_ms: 1
+    mode: 2
+    end_effector_frame: end_effector_link
+  frames:
+    base: base_link
+    odom: odom
+    footprint: base_footprint
+  pose_contract:
+    joint_angle_unit: degree
+    transform_translation_unit: meter
+    transform_rotation_unit: radian
+    status: needs_runtime_confirmation
+
+gripper:
+  transport: serial_and_zenoh
+  status_topic_template: "{device_group_name}/slave_arm/{side}/Gripper_status"
+  position_topic_template: "{device_group_name}/slave_arm/{side}/Gripper_position"
+  control_topic_template: "{device_group_name}/arm/{side}/gripper_control"
+  serial:
+    left: /dev/ttyUSB0
+    right: /dev/ttyUSB1
+  status_unit: normalized_0_open_1_closed
+  model: unknown
+  serial_number: unknown
+
+zenoh:
+  device_group_name: vla
+  topic_templates:
+    slave_joint_angle: "{device_group_name}/slave_arm/{side}/Joint_angle"
+    master_joint_angle: "{device_group_name}/master_arm/{side}/Joint_angle"
+    slave_relative_pose: "{device_group_name}/slave_arm/{side}/Relative_pose"
+    reset_event: "{device_group_name}/joycon/ros_events"
+  payloads:
+    joint_angle: Joint_angle
+    gripper_status: Gripper_status
+    reset_event: Joy_con_event
+
+camera:
+  selected_for_object_capture: D455
+  devices:
+    - model: Intel RealSense D455
+      serial: "260722304986"
+      firmware: "5.17.3.10"
+      product_line: D400
+      usb_type: "3.2"
+      depth_scale_m_per_raw_unit: 0.0010000000474974513
+      physical_port: /sys/devices/pci0000:00/0000:00:14.0/usb2/2-3/2-3.1/2-3.1:1.0/video4linux/video0
+      namespace: head
+      camera_name: head_camera
+      role: primary_rgbd_candidate
+    - model: Intel RealSense D405
+      serial: "260322272099"
+      firmware: "5.15.1.55"
+      product_line: D400
+      usb_type: "3.2"
+      depth_scale_m_per_raw_unit: 0.00009999999747487452
+      physical_port: /sys/devices/pci0000:00/0000:00:14.0/usb2/2-3/2-3.2/2-3.2:1.0/video4linux/video6
+      namespace: left
+      camera_name: left_camera
+      role: close_range_candidate
+    - model: Intel RealSense D405
+      serial: "260322273941"
+      firmware: "5.15.1.55"
+      product_line: D400
+      usb_type: "3.2"
+      depth_scale_m_per_raw_unit: 0.00009999999747487452
+      physical_port: /sys/devices/pci0000:00/0000:00:14.0/usb2/2-3/2-3.3/2-3.3:1.0/video4linux/video12
+      namespace: right
+      camera_name: right_camera
+      role: close_range_candidate
+  stream_profile:
+    camera_serial: "260722304986"
+    color_format: rgb8
+    depth_format: z16
+    width: 640
+    height: 480
+    fps: 15
+    depth_to_color_registration: pyrealsense2.align
+    timestamp_domain: global_time
+  launch_namespaces:
+    head:
+      camera_name: head_camera
+      serial: "260722304986"
+      color_profile: "640,480,15"
+      depth_profile: "640,480,15"
+      publish_tf: false
+    left:
+      camera_name: left_camera
+      serial: "260322272099"
+      color_profile: "640,480,30"
+      depth_profile: "640,480,30"
+      publish_tf: false
+    right:
+      camera_name: right_camera
+      serial: "260322273941"
+      color_profile: "640,480,30"
+      depth_profile: "640,480,30"
+      publish_tf: false
+  mounting:
+    status: urdf_relations_identified_physical_serial_mount_pending
+    robot_description: /home/rpp/rpp_ws/src/robot/r1_description/xacro/r1_with_arm.xacro
+    relations:
+      head_camera: head_Link -> camera_H_link via camera_H_joint (fixed)
+      left_camera: left_moduan_link -> L_camera_d405_link via L_camera_d405_joint (fixed)
+      right_camera: right_moduan_link -> R_camera_d405_link via R_camera_d405_joint (fixed)
+    note: >-
+      The launch file disables RealSense TF publication. The serial-to-URDF mount
+      mapping and every camera optical-frame transform must be confirmed on the
+      physical robot before producing T_base_camera.
+  hand_eye_calibration: pending
