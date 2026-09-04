@@ -49,8 +49,17 @@ python -m pip install -e .
 python -m pip install -e ".[open3d]"
 ```
 
-也可继续使用 `requirements/base.txt` 和 `requirements/open3d.txt` 构建固定环境。
-安装后统一使用 `robot-grasp` 命令。
+也可使用 `requirements/lock.txt` 构建 P0-A Linux x86_64 可复现基线（Python 3.10.12；包含运行、Open3D
+和测试依赖的完整解析版本）：
+
+```bash
+python -m pip install -r requirements/lock.txt
+python -m pip install -e . --no-deps --no-build-isolation
+```
+
+`requirements/base.txt` 和 `requirements/open3d.txt` 仍保留为允许小版本更新的通用依赖清单。
+锁定文件只安装依赖，不安装本项目本身；完成上述两步后统一使用 `robot-grasp` 命令。该基线由
+`.github/workflows/p0-a.yml` 在每次 push 和 Pull Request 中自动验证。
 
 FoundationPose 是外部可选依赖，项目不会下载仓库、权重或 CUDA 依赖。应按所用
 FoundationPose 版本的文档单独安装，再填写
@@ -58,7 +67,8 @@ FoundationPose 版本的文档单独安装，再填写
 
 ## 1. 采集目录与校验
 
-序列布局如下，每帧的 RGB、深度、mask 和 pose 必须使用完全相同的文件 stem：
+启用 mask 融合时，每帧的 RGB、深度、mask 和 pose 必须使用完全相同的文件 stem；配置
+`use_mask: false` 时可以省略整个 `masks/` 目录，深度有效比例按整张图像统计：
 
 ```text
 sequence/
@@ -88,12 +98,14 @@ sequence/
 `1.0`。不能依靠隐含单位。相机位姿可由任何 SDK 采集，但采集端应适配
 `CameraPoseProvider.get_T_base_camera()`，核心代码不依赖具体机器人 SDK。
 
-严格校验会检查配对、图像尺寸、有效深度比例、4x4 末行、旋转正交性与行列式：
+严格校验会检查配对、图像尺寸、有效深度比例、4x4 末行、旋转正交性与行列式。默认要求 mask：
 
 ```bash
 robot-grasp validate-sequence \
   --input examples/minimal_sequence
 ```
+
+无 mask 序列可显式使用 `--no-mask`。
 
 仓库中的最小序列使用文本 PPM/PGM，不含大型二进制，仅用于格式和 dry-run 校验，不足以生成有意义的
 三维模型。真实重建应从多个视角采集清晰、对齐的 RGB-D、mask 和 `T_base_camera`。
@@ -179,7 +191,8 @@ T_camera_base = inverse(T_base_camera)
 - `fused.ply`：带估计法向的融合点云。
 - `mesh_high.ply`：移除退化面和小连通分量、计算法向的高分辨率 Mesh。
 - `mesh_collision.obj`：按 `collision_target_triangles` 做二次曲面简化的碰撞 Mesh。
-- `reconstruction_report.json`：帧数、有效深度比例、包围盒、顶点/三角形数和解析后配置。
+- `reconstruction_report.json`：帧数、有效深度比例、包围盒、顶点/三角形数，以及代码/依赖版本、输入
+  SHA-256 manifest、配置快照和运行时间。
 - `reconstruction_config.yaml`：可直接再次传给 `--config` 的完整重建参数。
 
 管线不会自动填补大孔洞。应通过增加有效视角和改善 mask 修复缺失表面。输出目录只要已经存在就默认拒绝；
@@ -214,8 +227,8 @@ robot-grasp reconstruct \
 | can | 67.490 x 118.617 x 67.481 | 604.623 x 173.342 x 261.054 | 537.133 mm | 0.252 mm |
 | remote | 184.989 x 28.254 x 53.561 | 240.000 x 120.292 x 158.355 | 104.794 mm | 4.080 mm |
 
-完整数据见
-[`outputs/reconstruction/housecat6d_opaque/benchmark_report.json`](outputs/reconstruction/housecat6d_opaque/benchmark_report.json)。
+完整数据位于本地生成的 `outputs/reconstruction/housecat6d_opaque/benchmark_report.json`（该目录被
+`.gitignore` 忽略，当前 checkout 不包含该运行产物）。
 三个不透明对象的 raw depth 同样严重失败，而且 raw 相对 `depth_gt` 的中位偏差分别约为
 `+12/+27/+23 mm`。相反，高分辨率 `depth_gt` 全部进入 5 mm 门槛。这否定了“仅杯子材料导致失败”，
 也不支持导入器单位或位姿方向错误是主因。HouseCat6D raw depth 与其 mask、姿态和 CAD 参考的组合不适合
@@ -408,7 +421,8 @@ robot-grasp accept \
 
 ## HOI4D / Wild6D 复杂度升级条件
 
-当前下载状态记录在 `data/raw/hoi4d/download_manifest.json`：HOI4D Mug 子集含 300 帧
+当前下载状态应记录在本地生成的 `data/raw/hoi4d/download_manifest.json`（数据目录被忽略，当前 checkout
+不包含该 manifest）：HOI4D Mug 子集含 300 帧
 RGB、raw/prior depth、内参与逐帧相机外参，但这个镜像子集不含对象 mask、精确实例 Mesh或对象 6D GT。
 因此它目前只能作为动态交互数据资产，不能直接宣称已验证对象 TSDF、FoundationPose 绝对误差或整条抓取
 管线。进入同等级验收前必须补齐并核对：

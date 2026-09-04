@@ -7,3 +7,8 @@
 
 - [`pipeline_review_and_roadmap_20260827.md`](pipeline_review_and_roadmap_20260827.md)：基于 HouseCat6D
   第一批结果的管线成熟度评审、主要不足与 P0/P1/P2 改进路线。
+- [`tsdf_status_and_plan_20260904.md`](tsdf_status_and_plan_20260904.md)：TSDF 重建现状、P0-A 基线结果和后续任务规划。
+- [`grasp_environment_analysis_20260904.md`](grasp_environment_analysis_20260904.md)：本仓库 grasp
+  候选契约、Python 环境、验证结果、能力边界与后续计划。
+- [`vscode_codex_remote_diagnosis_20260904.md`](vscode_codex_remote_diagnosis_20260904.md)：Remote-SSH
+  环境下 VS Code Codex 插件故障的版本、代理和认证诊断及恢复步骤。
