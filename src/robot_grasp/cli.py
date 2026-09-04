@@ -8,6 +8,7 @@ from typing import Any
 
 from .acceptance import run_acceptance
 from .bop import import_bop_sequence
+from .capture import capture_sequence_from_manifest
 from .config import load_acceptance_config, load_reconstruction_config
 from .errors import RobotGraspError, ValidationError
 from .foundationpose_evaluation import evaluate_foundationpose_sequence
@@ -48,6 +49,20 @@ def build_parser() -> argparse.ArgumentParser:
     validate_mask = validate.add_mutually_exclusive_group()
     validate_mask.add_argument("--use-mask", dest="use_mask", action="store_true", default=True)
     validate_mask.add_argument("--no-mask", dest="use_mask", action="store_false")
+    validate.add_argument(
+        "--require-capture-metadata",
+        action="store_true",
+        help="Require real-capture hardware, timestamp, synchronization, and pose provenance",
+    )
+
+    capture = commands.add_parser(
+        "capture-sequence",
+        help="Convert a camera/robot JSONL manifest into a validated strict RGB-D sequence",
+    )
+    capture.add_argument("--manifest", required=True, type=Path, help="Normalized JSONL frame manifest")
+    capture.add_argument("--config", required=True, type=Path, help="Capture hardware and camera profile YAML")
+    capture.add_argument("--output", required=True, type=Path)
+    _add_overwrite(capture)
 
     reconstruct = commands.add_parser("reconstruct", help="Fuse a validated sequence using Open3D TSDF")
     reconstruct.add_argument("--input", required=True, type=Path)
@@ -219,8 +234,17 @@ def run(args: argparse.Namespace) -> int:
             args.input,
             min_valid_depth_ratio=args.min_valid_depth_ratio,
             use_mask=args.use_mask,
+            require_capture_metadata=args.require_capture_metadata,
         )
         _print_json(sequence_summary(sequence))
+        return 0
+    if args.command == "capture-sequence":
+        _print_json(capture_sequence_from_manifest(
+            args.manifest,
+            args.config,
+            args.output,
+            overwrite=args.overwrite,
+        ))
         return 0
     if args.command == "reconstruct":
         _print_json(reconstruct_sequence(args.input, args.output, load_reconstruction_config(args.config), overwrite=args.overwrite))

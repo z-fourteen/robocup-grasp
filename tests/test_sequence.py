@@ -88,3 +88,39 @@ def test_mask_is_required_by_default(tmp_path):
     (tmp_path / "masks" / "000.png").unlink()
     with pytest.raises(ValidationError, match="Missing mask directory|No supported mask files"):
         validate_sequence(tmp_path)
+
+
+def test_strict_capture_validation_rejects_missing_metadata(tmp_path):
+    make_sequence(tmp_path)
+    with pytest.raises(ValidationError, match="missing \['capture', 'hardware'\]"):
+        validate_sequence(tmp_path, require_capture_metadata=True)
+
+
+def test_strict_capture_validation_rejects_unknown_hardware(tmp_path):
+    make_sequence(tmp_path)
+    write_json(tmp_path / "metadata.json", {
+        "schema_version": 2,
+        "depth_scale": 1000.0,
+        "object_id": "test_object",
+        "coordinate_frames": {"base": "base_link", "camera": "camera_color_optical_frame"},
+        "hardware": {
+            "camera": {"model": "Intel RealSense D455", "serial": "260722304986"},
+            "robot": {"model": "unknown", "serial": "unknown"},
+            "gripper": {"model": "unknown", "serial": "unknown"},
+        },
+        "capture": {
+            "timestamp_unit": "ns",
+            "rgb_depth_sync": {"mode": "software", "clock": "device", "max_delta_ms": 5},
+            "depth_to_color_registration": {"status": "registered", "method": "pyrealsense2.align"},
+            "pose_source": {"type": "robot_fk_plus_hand_eye", "base_frame": "base_link", "hand_eye_calibration_ref": "calibration/hand_eye.json"},
+        },
+    })
+    write_json(tmp_path / "poses" / "000.json", {
+        "T_base_camera": np.eye(4).tolist(),
+        "rgb_timestamp_ns": 1,
+        "depth_timestamp_ns": 1,
+        "pose_timestamp_ns": 1,
+        "pose_source": "robot_fk_plus_hand_eye",
+    })
+    with pytest.raises(ValidationError, match="must identify the real device"):
+        validate_sequence(tmp_path, require_capture_metadata=True)

@@ -1,0 +1,74 @@
+# RealSense D455 capture profile. Fill the marked runtime fields before
+# promoting a session to a strict real-capture sequence.
+schema_version: 2
+object_id: cup_01
+depth_scale: 999.999952502551
+use_mask: false
+
+intrinsics:
+  width: 640
+  height: 480
+  fx: 386.9253234863281
+  fy: 386.38720703125
+  cx: 316.42718505859375
+  cy: 248.73841857910156
+
+coordinate_frames:
+  base: base_link
+  camera: head_camera_color_optical_frame
+
+hardware:
+  camera:
+    model: Intel RealSense D455
+    serial: "260722304986"
+    firmware: "5.17.3.10"
+    sdk: pyrealsense2
+    sdk_version: "2.58.x"
+    namespace: head
+    camera_name: head_camera
+    color_optical_frame: head_camera_color_optical_frame
+    stream_profile: "640,480,15"
+  robot:
+    model: R1 mobile base with dual AR5 arms
+    serial: unknown
+    active_side: right
+    arm_model: AR5R08
+    ip: 192.168.11.61
+    joint_count: 6
+  gripper:
+    model: unknown
+    serial: unknown
+    side: right
+
+capture:
+  timestamp_unit: ns
+  rgb_depth_sync:
+    mode: unknown
+    clock: device
+    max_delta_ms: 5.0
+  depth_to_color_registration:
+    status: registered
+    method: pyrealsense2.align
+  pose_source:
+    type: robot_fk_plus_hand_eye
+    base_frame: base_link
+    robot_pose_topic: /right_arm/joint_states
+    hand_eye_calibration_ref: calibration/hand_eye_d455_right.json
+
+streams:
+  color:
+    format: rgb8
+    width: 640
+    height: 480
+    fps: 15
+  depth:
+    format: z16
+    width: 640
+    height: 480
+    fps: 15
+
+calibration:
+  intrinsics_source: realsense_sdk_active_profile
+  depth_scale_source: realsense_depth_sensor
+  hand_eye_status: pending
+  independent_validation_status: pending
