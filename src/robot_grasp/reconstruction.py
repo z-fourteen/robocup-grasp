@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
+import hashlib
+import importlib.metadata
+import platform
 from pathlib import Path
+import subprocess
+import sys
+import time
 from typing import Any
 
 import numpy as np
@@ -13,6 +20,7 @@ from .io_utils import dump_json, dump_yaml, prepare_output_dir
 from .open3d_utils import require_open3d
 from .sequence import ValidatedSequence, validate_sequence
 from .transforms import invert_transform
+from . import __version__
 
 
 def _read_rgb(path: Path) -> np.ndarray:
@@ -63,6 +71,66 @@ def _bbox_report(geometry: Any) -> dict[str, list[float]]:
     }
 
 
+def _input_manifest(root: Path) -> list[dict[str, Any]]:
+    """Return a deterministic manifest of every file under a sequence root."""
+    manifest: list[dict[str, Any]] = []
+    for path in sorted(path for path in root.rglob("*") if path.is_file()):
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        manifest.append({
+            "path": path.relative_to(root).as_posix(),
+            "size_bytes": path.stat().st_size,
+            "sha256": digest.hexdigest(),
+        })
+    return manifest
+
+
+def _git_commit() -> str | None:
+    try:
+        repo_root = Path(__file__).resolve().parents[2]
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    commit = result.stdout.strip()
+    return commit or None
+
+
+def _dependency_versions() -> dict[str, str | None]:
+    names = {
+        "numpy": "numpy",
+        "Pillow": "Pillow",
+        "PyYAML": "PyYAML",
+        "jsonschema": "jsonschema",
+        "open3d": "open3d",
+    }
+    versions: dict[str, str | None] = {}
+    for label, distribution in names.items():
+        try:
+            versions[label] = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            versions[label] = None
+    return versions
+
+
+def _runtime_context(started_at: datetime, elapsed_seconds: float) -> dict[str, Any]:
+    return {
+        "started_at_utc": started_at.isoformat(),
+        "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+        "elapsed_seconds": float(elapsed_seconds),
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+    }
+
+
 def reconstruct_sequence(
     input_dir: str | Path,
     output_dir: str | Path,
@@ -70,9 +138,14 @@ def reconstruct_sequence(
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
+    started_at = datetime.now(timezone.utc)
+    timer_start = time.monotonic()
     sequence: ValidatedSequence = validate_sequence(
-        input_dir, min_valid_depth_ratio=config.min_valid_depth_ratio
+        input_dir,
+        min_valid_depth_ratio=config.min_valid_depth_ratio,
+        use_mask=config.use_mask,
     )
+    input_manifest = _input_manifest(sequence.root)
     o3d = require_open3d("TSDF reconstruction")
     output = prepare_output_dir(output_dir, overwrite=overwrite)
 
@@ -96,8 +169,12 @@ def reconstruct_sequence(
         raw_depth = _read_single_channel(frame.depth_path).astype(np.float32)
         depth_m = raw_depth / sequence.depth_scale
         valid = np.isfinite(depth_m) & (depth_m >= config.depth_min) & (depth_m <= config.depth_max)
+        mask = None
         if config.use_mask:
-            valid &= _read_single_channel(frame.mask_path) > 0
+            if frame.mask_path is None:
+                raise ValidationError(f"Frame {frame.stem} has no mask although use_mask=true.")
+            mask = _read_single_channel(frame.mask_path) > 0
+            valid &= mask
         if np.any(valid) and (config.depth_quantile_low > 0.0 or config.depth_quantile_high < 1.0):
             low, high = np.quantile(
                 depth_m[valid], [config.depth_quantile_low, config.depth_quantile_high]
@@ -107,7 +184,8 @@ def reconstruct_sequence(
         else:
             depth_quantile_ranges[frame.stem] = None
         depth_m[~valid] = 0.0
-        fusion_ratios.append(float(np.count_nonzero(valid) / valid.size))
+        eligible_pixels = int(np.count_nonzero(mask)) if mask is not None else valid.size
+        fusion_ratios.append(float(np.count_nonzero(valid) / max(1, eligible_pixels)))
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
             o3d.geometry.Image(rgb),
             o3d.geometry.Image(np.ascontiguousarray(depth_m)),
@@ -155,6 +233,7 @@ def reconstruct_sequence(
         if not writer(str(path), geometry):
             raise RobotGraspError(f"Open3D failed to write {path}. Check permissions and output format support.")
 
+    elapsed_seconds = time.monotonic() - timer_start
     resolved_config = config.to_dict() | {"depth_scale": sequence.depth_scale, "length_unit": "meter"}
     # This file can be passed back to --config without removing report-only metadata.
     dump_yaml(output / "reconstruction_config.yaml", config.to_dict())
@@ -167,6 +246,7 @@ def reconstruct_sequence(
             "per_frame": dict(zip((frame.stem for frame in sequence.frames), fusion_ratios)),
             "mean": float(np.mean(fusion_ratios)),
             "min": float(np.min(fusion_ratios)),
+            "denominator": "mask_pixels" if config.use_mask else "image_pixels",
         },
         "depth_quantile_ranges_m": depth_quantile_ranges,
         "bounding_box": _bbox_report(mesh),
@@ -176,6 +256,15 @@ def reconstruct_sequence(
         "collision_triangle_count": len(collision_mesh.triangles),
         "cleanup": cleanup,
         "config": resolved_config,
+        "config_snapshot": config.to_dict(),
+        "code": {
+            "package": "robot_grasp",
+            "version": __version__,
+            "git_commit": _git_commit(),
+        },
+        "dependencies": _dependency_versions(),
+        "input_manifest": input_manifest,
+        "runtime": _runtime_context(started_at, elapsed_seconds),
         "outputs": {name: str(path) for name, path in outputs.items()},
         "hole_filling": False,
     }
