@@ -59,3 +59,32 @@ def test_image_size_mismatch_names_image(tmp_path):
     Image.fromarray(np.zeros((2, 4, 3), dtype=np.uint8)).save(tmp_path / "rgb" / "000.png")
     with pytest.raises(ValidationError, match="has size 4x2, expected 4x3"):
         validate_sequence(tmp_path)
+
+
+def test_mask_is_optional_when_disabled(tmp_path):
+    make_sequence(tmp_path)
+    (tmp_path / "masks" / "000.png").unlink()
+    (tmp_path / "masks").rmdir()
+
+    sequence = validate_sequence(tmp_path, use_mask=False)
+
+    assert sequence.frames[0].mask_path is None
+    assert sequence.frames[0].valid_depth_ratio == 1.0
+
+
+def test_optional_masks_are_ignored_when_disabled(tmp_path):
+    make_sequence(tmp_path)
+    (tmp_path / "masks" / "000.png").rename(tmp_path / "masks" / "stale.png")
+    (tmp_path / "masks" / "not-an-image.txt").write_text("ignored", encoding="utf-8")
+
+    sequence = validate_sequence(tmp_path, use_mask=False)
+
+    assert sequence.frames[0].mask_path is None
+    assert sequence.frames[0].valid_depth_ratio == 1.0
+
+
+def test_mask_is_required_by_default(tmp_path):
+    make_sequence(tmp_path)
+    (tmp_path / "masks" / "000.png").unlink()
+    with pytest.raises(ValidationError, match="Missing mask directory|No supported mask files"):
+        validate_sequence(tmp_path)

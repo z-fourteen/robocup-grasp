@@ -45,6 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     validate = commands.add_parser("validate-sequence", help="Strictly validate an RGB-D sequence")
     validate.add_argument("--input", required=True, type=Path)
     validate.add_argument("--min-valid-depth-ratio", type=float, default=0.01)
+    validate_mask = validate.add_mutually_exclusive_group()
+    validate_mask.add_argument("--use-mask", dest="use_mask", action="store_true", default=True)
+    validate_mask.add_argument("--no-mask", dest="use_mask", action="store_false")
 
     reconstruct = commands.add_parser("reconstruct", help="Fuse a validated sequence using Open3D TSDF")
     reconstruct.add_argument("--input", required=True, type=Path)
@@ -212,7 +215,11 @@ def _run_grasps(args: argparse.Namespace) -> int:
 
 def run(args: argparse.Namespace) -> int:
     if args.command == "validate-sequence":
-        sequence = validate_sequence(args.input, min_valid_depth_ratio=args.min_valid_depth_ratio)
+        sequence = validate_sequence(
+            args.input,
+            min_valid_depth_ratio=args.min_valid_depth_ratio,
+            use_mask=args.use_mask,
+        )
         _print_json(sequence_summary(sequence))
         return 0
     if args.command == "reconstruct":

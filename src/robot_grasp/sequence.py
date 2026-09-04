@@ -34,7 +34,7 @@ class SequenceFrame:
     stem: str
     rgb_path: Path
     depth_path: Path
-    mask_path: Path
+    mask_path: Path | None
     pose_path: Path
     T_base_camera: np.ndarray
     valid_depth_ratio: float
@@ -46,15 +46,24 @@ class ValidatedSequence:
     intrinsics: Intrinsics
     metadata: dict[str, Any]
     frames: tuple[SequenceFrame, ...]
+    use_mask: bool = True
 
     @property
     def depth_scale(self) -> float:
         return float(self.metadata["depth_scale"])
 
 
-def _file_map(directory: Path, extensions: set[str], label: str, errors: list[str]) -> dict[str, Path]:
+def _file_map(
+    directory: Path,
+    extensions: set[str],
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+) -> dict[str, Path]:
     if not directory.is_dir():
-        errors.append(f"Missing {label} directory: {directory}. Create it and add one file per frame.")
+        if required:
+            errors.append(f"Missing {label} directory: {directory}. Create it and add one file per frame.")
         return {}
     result: dict[str, Path] = {}
     for path in sorted(directory.iterdir()):
@@ -66,7 +75,7 @@ def _file_map(directory: Path, extensions: set[str], label: str, errors: list[st
             )
         else:
             result[path.stem] = path
-    if not result:
+    if required and not result:
         errors.append(f"No supported {label} files found in {directory}. Supported extensions: {sorted(extensions)}.")
     return result
 
@@ -146,9 +155,23 @@ def _read_image(path: Path, label: str, errors: list[str]) -> np.ndarray | None:
         return None
 
 
-def validate_sequence(root: str | Path, *, min_valid_depth_ratio: float = 0.01) -> ValidatedSequence:
+def validate_sequence(
+    root: str | Path,
+    *,
+    min_valid_depth_ratio: float = 0.01,
+    use_mask: bool = True,
+) -> ValidatedSequence:
+    """Validate an RGB-D sequence using an explicit mask contract.
+
+    When ``use_mask`` is true, every frame must provide a mask and valid-depth
+    ratios use mask pixels as the denominator. When false, masks are optional,
+    ignored for depth validity, and ratios use all image pixels as the
+    denominator.
+    """
     root = Path(root)
     errors: list[str] = []
+    if not isinstance(use_mask, bool):
+        errors.append(f"use_mask must be true or false, got {use_mask!r}.")
     if not root.is_dir():
         raise ValidationError(f"Sequence directory does not exist: {root}. Pass the directory containing rgb/depth/masks/poses.")
     intrinsics = _parse_intrinsics(root / "intrinsics.json", errors)
@@ -156,11 +179,16 @@ def validate_sequence(root: str | Path, *, min_valid_depth_ratio: float = 0.01) 
 
     rgb = _file_map(root / "rgb", IMAGE_EXTENSIONS, "RGB", errors)
     depth = _file_map(root / "depth", IMAGE_EXTENSIONS, "depth", errors)
-    masks = _file_map(root / "masks", IMAGE_EXTENSIONS, "mask", errors)
+    masks = _file_map(root / "masks", IMAGE_EXTENSIONS, "mask", errors) if use_mask else {}
     poses = _file_map(root / "poses", {".json"}, "pose", errors)
-    all_stems = set().union(rgb, depth, masks, poses)
+    all_stems = set().union(rgb, depth, poses)
+    if use_mask:
+        all_stems |= set(masks)
+    required_files = [("RGB", rgb), ("depth", depth), ("pose", poses)]
+    if use_mask:
+        required_files.append(("mask", masks))
     for stem in sorted(all_stems):
-        missing = [label for label, files in (("RGB", rgb), ("depth", depth), ("mask", masks), ("pose", poses)) if stem not in files]
+        missing = [label for label, files in required_files if stem not in files]
         if missing:
             errors.append(
                 f"Frame '{stem}' is missing {missing}. Add files with the exact stem '{stem}' or remove the unmatched files."
@@ -170,14 +198,21 @@ def validate_sequence(root: str | Path, *, min_valid_depth_ratio: float = 0.01) 
     if not 0.0 <= min_valid_depth_ratio <= 1.0:
         errors.append(f"min_valid_depth_ratio must be within [0, 1], got {min_valid_depth_ratio}.")
     if intrinsics is not None and metadata is not None:
-        for stem in sorted(set(rgb) & set(depth) & set(masks) & set(poses)):
+        complete_stems = set(rgb) & set(depth) & set(poses)
+        if use_mask:
+            complete_stems &= set(masks)
+        for stem in sorted(complete_stems):
             rgb_image = _read_image(rgb[stem], "RGB", errors)
             depth_image = _read_image(depth[stem], "depth", errors)
-            mask_image = _read_image(masks[stem], "mask", errors)
+            mask_path = masks.get(stem)
+            mask_image = _read_image(mask_path, "mask", errors) if mask_path is not None else None
             expected = (intrinsics.height, intrinsics.width)
             for label, path, image in (
-                ("RGB", rgb[stem], rgb_image), ("depth", depth[stem], depth_image), ("mask", masks[stem], mask_image)
+                ("RGB", rgb[stem], rgb_image), ("depth", depth[stem], depth_image),
+                ("mask", mask_path, mask_image)
             ):
+                if path is None:
+                    continue
                 if image is not None and image.shape[:2] != expected:
                     errors.append(
                         f"{label} image {path} has size {image.shape[1]}x{image.shape[0]}, expected "
@@ -193,7 +228,7 @@ def validate_sequence(root: str | Path, *, min_valid_depth_ratio: float = 0.01) 
             valid_ratio = 0.0
             if depth_image is not None and depth_image.ndim == 2:
                 valid = np.isfinite(depth_image) & (depth_image > 0)
-                if mask_image is not None and mask_image.ndim == 2 and mask_image.shape == depth_image.shape:
+                if use_mask and mask_image is not None and mask_image.ndim == 2 and mask_image.shape == depth_image.shape:
                     valid &= mask_image > 0
                     denominator = max(1, int(np.count_nonzero(mask_image)))
                 else:
@@ -216,12 +251,12 @@ def validate_sequence(root: str | Path, *, min_valid_depth_ratio: float = 0.01) 
             except ValidationError as exc:
                 errors.append(str(exc))
                 continue
-            frames.append(SequenceFrame(stem, rgb[stem], depth[stem], masks[stem], poses[stem], transform, valid_ratio))
+            frames.append(SequenceFrame(stem, rgb[stem], depth[stem], mask_path, poses[stem], transform, valid_ratio))
 
     if errors:
         raise ValidationError("Sequence validation failed:\n- " + "\n- ".join(errors))
     assert intrinsics is not None and metadata is not None
-    return ValidatedSequence(root, intrinsics, metadata, tuple(frames))
+    return ValidatedSequence(root, intrinsics, metadata, tuple(frames), use_mask=use_mask)
 
 
 def sequence_summary(sequence: ValidatedSequence) -> dict[str, Any]:
@@ -231,6 +266,8 @@ def sequence_summary(sequence: ValidatedSequence) -> dict[str, Any]:
         "object_id": sequence.metadata["object_id"],
         "frame_count": len(sequence.frames),
         "depth_scale": sequence.depth_scale,
+        "use_mask": sequence.use_mask,
+        "valid_depth_ratio_denominator": "mask_pixels" if sequence.use_mask else "image_pixels",
         "mean_valid_depth_ratio": float(np.mean(ratios)) if ratios else 0.0,
         "min_valid_depth_ratio": float(np.min(ratios)) if ratios else 0.0,
         "status": "valid",
